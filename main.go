@@ -1,17 +1,27 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/build"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"regexp"
 )
 
-var pkgs = make(map[string][]string)
+var (
+	pkgs     = make(map[string][]string)
+	matchvar = flag.String("match", ".*", "filter packages")
+	pkgmatch *regexp.Regexp
+)
 
 func findImport(p string) {
+	if !pkgmatch.MatchString(p) {
+		// doesn't match the filter, skip it
+		return
+	}
 	if p == "C" {
 		// C isn't really a package
 		pkgs["C"] = nil
@@ -53,8 +63,15 @@ func keys() map[string]int {
 	return m
 }
 
+func init() {
+	flag.Parse()
+	pkgmatch = regexp.MustCompile(*matchvar)
+}
+
 func main() {
-	findImport(os.Args[1])
+	for _, pkg := range flag.Args() {
+		findImport(pkg)
+	}
 	cmd := exec.Command("dot", "-Tsvg")
 	in, err := cmd.StdinPipe()
 	if err != nil {
