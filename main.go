@@ -1,12 +1,12 @@
 package main
 
 import (
-	"go/build"
 	"fmt"
+	"go/build"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
-	"log"
-	"io/ioutil"
 )
 
 var (
@@ -14,11 +14,11 @@ var (
 )
 
 func findImport(p string) {
-	if p == "C" { 
-		pkgs["C"]= nil
+	if p == "C" {
+		pkgs["C"] = nil
 	}
 	if _, ok := pkgs[p]; ok {
-		return 
+		return
 	}
 	pkg, err := build.Import(p, "", 0)
 	if err != nil {
@@ -28,10 +28,10 @@ func findImport(p string) {
 	for _, pkg := range pkg.Imports {
 		findImport(pkg)
 	}
-}	
+}
 
 func allKeys() []string {
-	keys := make(map[string]bool) 
+	keys := make(map[string]bool)
 	for k, v := range pkgs {
 		keys[k] = true
 		for _, v := range v {
@@ -48,7 +48,7 @@ func allKeys() []string {
 func keys() map[string]int {
 	m := make(map[string]int)
 	for i, k := range allKeys() {
-		m[k] = i 
+		m[k] = i
 	}
 	return m
 }
@@ -57,11 +57,17 @@ func main() {
 	findImport(os.Args[1])
 	cmd := exec.Command("dot", "-Tsvg")
 	in, err := cmd.StdinPipe()
-	if err != nil { log.Fatal(err) }
+	if err != nil {
+		log.Fatal(err)
+	}
 	out, err := ioutil.TempFile("", "")
-	if err != nil { log.Fatal(err) }
+	if err != nil {
+		log.Fatal(err)
+	}
 	cmd.Stdout = out
-	if err := cmd.Start(); err != nil { log.Fatal(err) }
+	if err := cmd.Start(); err != nil {
+		log.Fatal(err)
+	}
 	fmt.Fprintf(in, "digraph %q {\n", os.Args[1])
 	keys := keys()
 	for p, i := range keys {
@@ -69,13 +75,15 @@ func main() {
 	}
 	for k, v := range pkgs {
 		for _, p := range v {
-			fmt.Fprintf(in,"\tN%d -> N%d [weight=1];\n", keys[k], keys[p])
+			fmt.Fprintf(in, "\tN%d -> N%d [weight=1];\n", keys[k], keys[p])
 		}
 	}
-	fmt.Fprintf(in,"}\n") 
+	fmt.Fprintf(in, "}\n")
 	in.Close()
-	if err := cmd.Wait(); err != nil { log.Fatal(err) }
+	if err := cmd.Wait(); err != nil {
+		log.Fatal(err)
+	}
 	out.Close()
 	os.Rename(out.Name(), out.Name()+".svg")
-	fmt.Println(out.Name()+".svg")
+	fmt.Println(out.Name() + ".svg")
 }
