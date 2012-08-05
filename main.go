@@ -9,15 +9,15 @@ import (
 	"os/exec"
 )
 
-var (
-	pkgs = make(map[string][]string)
-)
+var pkgs = make(map[string][]string)
 
 func findImport(p string) {
 	if p == "C" {
+		// C isn't really a package
 		pkgs["C"] = nil
 	}
 	if _, ok := pkgs[p]; ok {
+		// seen this package before, skip it
 		return
 	}
 	pkg, err := build.Import(p, "", 0)
