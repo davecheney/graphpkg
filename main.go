@@ -34,10 +34,20 @@ func findImport(p string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pkgs[p] = pkg.Imports
-	for _, pkg := range pkg.Imports {
+	pkgs[p] = filter(pkg.Imports)
+	for _, pkg := range pkgs[p] {
 		findImport(pkg)
 	}
+}
+
+func filter(s []string) []string {
+	var r []string
+	for _, v := range s {
+		if pkgmatch.MatchString(v) {
+			r = append(r, v)
+		}
+	}
+	return r
 }
 
 func allKeys() []string {
@@ -85,7 +95,7 @@ func main() {
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Fprintf(in, "digraph %q {\n", os.Args[1])
+	fmt.Fprintf(in, "digraph {\n")
 	keys := keys()
 	for p, i := range keys {
 		fmt.Fprintf(in, "\tN%d [label=%q,shape=box,box];\n", i, p)
