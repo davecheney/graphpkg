@@ -92,13 +92,14 @@ func main() {
 		log.Fatal(err)
 	}
 	cmd.Stdout = out
+	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Fprintf(in, "digraph {\n")
 	keys := keys()
 	for p, i := range keys {
-		fmt.Fprintf(in, "\tN%d [label=%q,shape=box,box];\n", i, p)
+		fmt.Fprintf(in, "\tN%d [label=%q,shape=box];\n", i, p)
 	}
 	for k, v := range pkgs {
 		for _, p := range v {
