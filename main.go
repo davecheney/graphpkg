@@ -1,3 +1,11 @@
+// Graphpkg produces an svg graph of the dependency tree of a package
+// 
+// Requires
+// - dot (graphviz)
+//
+// Usage
+//
+//     graphpkg path/to/your/package
 package main
 
 import (
