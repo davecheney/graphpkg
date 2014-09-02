@@ -4,11 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"regexp"
+
+	"github.com/pkg/browser"
 )
 
 var (
@@ -78,27 +79,27 @@ func init() {
 	pkgmatch = regexp.MustCompile(*matchvar)
 }
 
+func check(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	for _, pkg := range flag.Args() {
 		findImport(pkg)
 	}
 	cmd := exec.Command("dot", "-Tsvg")
 	in, err := cmd.StdinPipe()
-	if err != nil {
-		log.Fatal(err)
-	}
-	out, err := ioutil.TempFile("", "")
-	if err != nil {
-		log.Fatal(err)
-	}
-	cmd.Stdout = out
-	if err := cmd.Start(); err != nil {
-		log.Fatal(err)
-	}
+	check(err)
+	out, err := cmd.StdoutPipe()
+	cmd.Stderr = os.Stderr
+	check(cmd.Start())
+
 	fmt.Fprintf(in, "digraph {\n")
 	keys := keys()
 	for p, i := range keys {
-		fmt.Fprintf(in, "\tN%d [label=%q,shape=box,box];\n", i, p)
+		fmt.Fprintf(in, "\tN%d [label=%q,shape=box];\n", i, p)
 	}
 	for k, v := range pkgs {
 		for _, p := range v {
@@ -107,10 +108,8 @@ func main() {
 	}
 	fmt.Fprintf(in, "}\n")
 	in.Close()
-	if err := cmd.Wait(); err != nil {
-		log.Fatal(err)
-	}
-	out.Close()
-	os.Rename(out.Name(), out.Name()+".svg")
-	fmt.Println(out.Name() + ".svg")
+
+	go browser.OpenReader(out)
+
+	check(cmd.Wait())
 }
