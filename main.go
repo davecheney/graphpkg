@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -21,9 +22,10 @@ import (
 )
 
 var (
-	pkgs     = make(map[string][]string)
-	matchvar = flag.String("match", ".*", "filter packages")
-	pkgmatch *regexp.Regexp
+	pkgs       = make(map[string][]string)
+	matchvar   = flag.String("match", ".*", "filter packages")
+	browservar = flag.Bool("browser", false, "open a browser with the output")
+	pkgmatch   *regexp.Regexp
 )
 
 func findImport(p string) {
@@ -123,7 +125,15 @@ func main() {
 	fmt.Fprintf(in, "}\n")
 	in.Close()
 
-	go browser.OpenReader(out)
+	if *browservar {
+		fmt.Println("opening in your browser...")
+		go func() {
+			err := browser.OpenReader(out)
+			check(err)
+		}()
+	} else {
+		io.Copy(os.Stdout, out)
+	}
 
 	check(cmd.Wait())
 }
