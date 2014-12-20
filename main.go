@@ -1,5 +1,5 @@
 // Graphpkg produces an svg graph of the dependency tree of a package
-// 
+//
 // Requires
 // - dot (graphviz)
 //
@@ -94,7 +94,13 @@ func check(err error) {
 }
 
 func main() {
-	for _, pkg := range flag.Args() {
+	args := flag.Args()
+	if len(args) == 0 {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] <package name>\n", os.Args[0])
+		os.Exit(1)
+	}
+
+	for _, pkg := range args {
 		findImport(pkg)
 	}
 	cmd := exec.Command("dot", "-Tsvg")
