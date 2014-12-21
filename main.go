@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/browser"
 )
@@ -24,7 +25,7 @@ var (
 	pkgs       = make(map[string][]string)
 	matchvar   = flag.String("match", ".*", "filter packages")
 	browservar = flag.Bool("browser", false, "open a browser with the output")
-	formatvar  = flag.String("format", "svg", "format: {svg, dot, d3json}")
+	formatvar  = flag.String("format", "dot-svg", "format: {dot, dot-*, d3json}")
 	pkgmatch   *regexp.Regexp
 )
 
@@ -97,13 +98,14 @@ func main() {
 
 func xform(w io.WriteCloser) {
 	var err error
-	switch *formatvar {
-	case "d3json":
+	switch {
+	case *formatvar == "d3json":
 		err = writeD3JSON(w, &pkgs)
-	case "svg":
-		err = writeSVG(w, &pkgs)
-	case "dot":
+	case *formatvar == "dot":
 		err = writeDotRaw(w, &pkgs)
+	case strings.HasPrefix(*formatvar, "dot-"):
+		f := (*formatvar)[4:]
+		err = writeDotOutput(w, f, &pkgs)
 	default:
 		err = fmt.Errorf("error: unknown format %s", *formatvar)
 	}

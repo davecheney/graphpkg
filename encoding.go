@@ -70,11 +70,6 @@ func writeDotOutput(out io.Writer, fmt string, pkgs *map[string][]string) error 
 	return cmd.Wait()
 }
 
-// writeSVG uses graphviz's dot util to convert dot fmt into svg
-func writeSVG(out io.Writer, pkgs *map[string][]string) error {
-	return writeDotOutput(out, "svg", pkgs)
-}
-
 type d3pkg struct {
 	Name    string   `json:"name,omitempty"`
 	Size    int      `json:"size,omitempty"`
