@@ -15,7 +15,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"regexp"
 
 	"github.com/pkg/browser"
@@ -25,6 +24,7 @@ var (
 	pkgs       = make(map[string][]string)
 	matchvar   = flag.String("match", ".*", "filter packages")
 	browservar = flag.Bool("browser", false, "open a browser with the output")
+	formatvar  = flag.String("format", "svg", "format: {svg, dot, d3json}")
 	pkgmatch   *regexp.Regexp
 )
 
@@ -61,30 +61,11 @@ func filter(s []string) []string {
 	return r
 }
 
-func allKeys() []string {
-	keys := make(map[string]bool)
-	for k, v := range pkgs {
-		keys[k] = true
-		for _, v := range v {
-			keys[v] = true
-		}
-	}
-	v := make([]string, 0, len(keys))
-	for k, _ := range keys {
-		v = append(v, k)
-	}
-	return v
-}
-
-func keys() map[string]int {
-	m := make(map[string]int)
-	for i, k := range allKeys() {
-		m[k] = i
-	}
-	return m
-}
-
 func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] <package name>\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	pkgmatch = regexp.MustCompile(*matchvar)
 }
@@ -98,42 +79,46 @@ func check(err error) {
 func main() {
 	args := flag.Args()
 	if len(args) == 0 {
-		fmt.Fprintf(os.Stderr, "usage: %s [flags] <package name>\n", os.Args[0])
+		flag.Usage()
 		os.Exit(1)
 	}
 
 	for _, pkg := range args {
 		findImport(pkg)
 	}
-	cmd := exec.Command("dot", "-Tsvg")
-	in, err := cmd.StdinPipe()
+
+	r, w, err := os.Pipe()
 	check(err)
-	out, err := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
-	check(cmd.Start())
 
-	fmt.Fprintf(in, "digraph {\n")
-	keys := keys()
-	for p, i := range keys {
-		fmt.Fprintf(in, "\tN%d [label=%q,shape=box];\n", i, p)
-	}
-	for k, v := range pkgs {
-		for _, p := range v {
-			fmt.Fprintf(in, "\tN%d -> N%d [weight=1];\n", keys[k], keys[p])
-		}
-	}
-	fmt.Fprintf(in, "}\n")
-	in.Close()
+	// run the transform
+	go xform(w)
+	output(r)
+}
 
-	if *browservar {
+func xform(w io.WriteCloser) {
+	var err error
+	switch *formatvar {
+	case "d3json":
+		err = writeD3JSON(w, &pkgs)
+	case "svg":
+		err = writeSVG(w, &pkgs)
+	case "dot":
+		err = writeDotRaw(w, &pkgs)
+	default:
+		err = fmt.Errorf("error: unknown format %s", *formatvar)
+	}
+	w.Close()
+	check(err)
+}
+
+func output(r io.Reader) {
+	var err error
+	switch {
+	case *browservar:
 		fmt.Println("opening in your browser...")
-		go func() {
-			err := browser.OpenReader(out)
-			check(err)
-		}()
-	} else {
-		io.Copy(os.Stdout, out)
+		err = browser.OpenReader(r)
+	default:
+		_, err = io.Copy(os.Stdout, r)
 	}
-
-	check(cmd.Wait())
+	check(err)
 }
