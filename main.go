@@ -1,5 +1,5 @@
 // Graphpkg produces an svg graph of the dependency tree of a package
-// 
+//
 // Requires
 // - dot (graphviz)
 //
@@ -12,18 +12,21 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"io"
 	"log"
 	"os"
-	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/browser"
 )
 
 var (
-	pkgs     = make(map[string][]string)
-	matchvar = flag.String("match", ".*", "filter packages")
-	pkgmatch *regexp.Regexp
+	pkgs       = make(map[string][]string)
+	matchvar   = flag.String("match", ".*", "filter packages")
+	browservar = flag.Bool("browser", false, "open a browser with the output")
+	formatvar  = flag.String("format", "dot-svg", "format: {dot, dot-*, d3json}")
+	pkgmatch   *regexp.Regexp
 )
 
 func findImport(p string) {
@@ -59,30 +62,11 @@ func filter(s []string) []string {
 	return r
 }
 
-func allKeys() []string {
-	keys := make(map[string]bool)
-	for k, v := range pkgs {
-		keys[k] = true
-		for _, v := range v {
-			keys[v] = true
-		}
-	}
-	v := make([]string, 0, len(keys))
-	for k, _ := range keys {
-		v = append(v, k)
-	}
-	return v
-}
-
-func keys() map[string]int {
-	m := make(map[string]int)
-	for i, k := range allKeys() {
-		m[k] = i
-	}
-	return m
-}
-
 func init() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s [flags] <package name>\n\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	pkgmatch = regexp.MustCompile(*matchvar)
 }
@@ -94,30 +78,49 @@ func check(err error) {
 }
 
 func main() {
-	for _, pkg := range flag.Args() {
+	args := flag.Args()
+	if len(args) == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	for _, pkg := range args {
 		findImport(pkg)
 	}
-	cmd := exec.Command("dot", "-Tsvg")
-	in, err := cmd.StdinPipe()
+
+	r, w, err := os.Pipe()
 	check(err)
-	out, err := cmd.StdoutPipe()
-	cmd.Stderr = os.Stderr
-	check(cmd.Start())
 
-	fmt.Fprintf(in, "digraph {\n")
-	keys := keys()
-	for p, i := range keys {
-		fmt.Fprintf(in, "\tN%d [label=%q,shape=box];\n", i, p)
+	// run the transform
+	go xform(w)
+	output(r)
+}
+
+func xform(w io.WriteCloser) {
+	var err error
+	switch {
+	case *formatvar == "d3json":
+		err = writeD3JSON(w, &pkgs)
+	case *formatvar == "dot":
+		err = writeDotRaw(w, &pkgs)
+	case strings.HasPrefix(*formatvar, "dot-"):
+		f := (*formatvar)[4:]
+		err = writeDotOutput(w, f, &pkgs)
+	default:
+		err = fmt.Errorf("error: unknown format %s", *formatvar)
 	}
-	for k, v := range pkgs {
-		for _, p := range v {
-			fmt.Fprintf(in, "\tN%d -> N%d [weight=1];\n", keys[k], keys[p])
-		}
+	w.Close()
+	check(err)
+}
+
+func output(r io.Reader) {
+	var err error
+	switch {
+	case *browservar:
+		fmt.Println("opening in your browser...")
+		err = browser.OpenReader(r)
+	default:
+		_, err = io.Copy(os.Stdout, r)
 	}
-	fmt.Fprintf(in, "}\n")
-	in.Close()
-
-	go browser.OpenReader(out)
-
-	check(cmd.Wait())
+	check(err)
 }
