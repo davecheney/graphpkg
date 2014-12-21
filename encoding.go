@@ -81,11 +81,20 @@ func writeD3JSON(w io.Writer, pkgs *map[string][]string) error {
 	d3pkgs := pkgsToD3Pkgs(pkgs)
 	enc := json.NewEncoder(w)
 
+	w.Write([]byte("["))
+	first := true
 	for _, p := range *d3pkgs {
+		if first {
+			first = false
+		} else {
+			w.Write([]byte(","))
+		}
+
 		if err := enc.Encode(p); err != nil {
 			return err
 		}
 	}
+	w.Write([]byte("]"))
 	return nil
 }
 
