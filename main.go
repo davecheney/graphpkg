@@ -1,5 +1,5 @@
 // Graphpkg produces an svg graph of the dependency tree of a package
-// 
+//
 // Requires
 // - dot (graphviz)
 //
@@ -117,7 +117,13 @@ func main() {
 	fmt.Fprintf(in, "}\n")
 	in.Close()
 
-	go browser.OpenReader(out)
+	ch := make(chan error)
+	go func() {
+		ch <- browser.OpenReader(out)
 
+	}()
 	check(cmd.Wait())
+	if err := <-ch; err != nil {
+		log.Fatalf("unable to open browser: %s", err)
+	}
 }
