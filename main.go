@@ -16,17 +16,63 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/browser"
 )
 
 var (
-	pkgs     = make(map[string][]string)
+	pkgs     = make(map[string]map[string]struct{})
+	seen     = make(map[string]struct{})
 	matchvar = flag.String("match", ".*", "filter packages")
+	maxLevel = flag.Uint("maxlevel", 0, "maximum package level to display")
 	pkgmatch *regexp.Regexp
 )
 
+func truncate(p string) string {
+	if *maxLevel == 0 {
+		return p
+	}
+
+	slice := strings.Split(p, "/")
+	lvl := int(*maxLevel)
+	if len(slice) < lvl {
+		lvl = len(slice)
+	}
+
+	return strings.Join(slice[:lvl], "/")
+}
+
+func truncateList(parent string, s []string) []string {
+	if *maxLevel == 0 {
+		return s
+	}
+
+	r := make([]string, 0, len(s))
+	for _, p := range s {
+		child := truncate(p)
+		if child == parent {
+			continue
+		}
+		r = append(r, child)
+	}
+
+	return r
+}
+
+func add(m map[string]struct{}, list ...string) map[string]struct{} {
+	if m == nil {
+		m = make(map[string]struct{})
+	}
+	for _, i := range list {
+		m[i] = struct{}{}
+	}
+	return m
+}
+
 func findImport(p string) {
+	t := truncate(p)
+
 	if !pkgmatch.MatchString(p) {
 		// doesn't match the filter, skip it
 		return
@@ -35,7 +81,7 @@ func findImport(p string) {
 		// C isn't really a package
 		pkgs["C"] = nil
 	}
-	if _, ok := pkgs[p]; ok {
+	if _, ok := seen[p]; ok {
 		// seen this package before, skip it
 		return
 	}
@@ -43,10 +89,13 @@ func findImport(p string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pkgs[p] = filter(pkg.Imports)
-	for _, pkg := range pkgs[p] {
+	deps := filter(pkg.Imports)
+	pkgs[t] = add(pkgs[t], truncateList(t, deps)...)
+
+	for _, pkg := range deps {
 		findImport(pkg)
 	}
+	seen[p] = struct{}{}
 }
 
 func filter(s []string) []string {
@@ -63,7 +112,7 @@ func allKeys() []string {
 	keys := make(map[string]bool)
 	for k, v := range pkgs {
 		keys[k] = true
-		for _, v := range v {
+		for v, _ := range v {
 			keys[v] = true
 		}
 	}
@@ -110,7 +159,7 @@ func main() {
 		fmt.Fprintf(in, "\tN%d [label=%q,shape=box];\n", i, p)
 	}
 	for k, v := range pkgs {
-		for _, p := range v {
+		for p, _ := range v {
 			fmt.Fprintf(in, "\tN%d -> N%d [weight=1];\n", keys[k], keys[p])
 		}
 	}
