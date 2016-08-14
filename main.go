@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"io"
 	"log"
 	"os"
 	"os/exec"
@@ -23,6 +24,7 @@ import (
 var (
 	pkgs     = make(map[string][]string)
 	matchvar = flag.String("match", ".*", "filter packages")
+	stdout   = flag.Bool("stdout", false, "print to standard output instead of browser")
 	pkgmatch *regexp.Regexp
 )
 
@@ -117,13 +119,20 @@ func main() {
 	fmt.Fprintf(in, "}\n")
 	in.Close()
 
-	ch := make(chan error)
-	go func() {
-		ch <- browser.OpenReader(out)
+	if *stdout {
+		// print to standard output
+		io.Copy(os.Stdout, out)
 
-	}()
-	check(cmd.Wait())
-	if err := <-ch; err != nil {
-		log.Fatalf("unable to open browser: %s", err)
+	} else {
+		// pipe output to browser
+		ch := make(chan error)
+		go func() {
+			ch <- browser.OpenReader(out)
+
+		}()
+		check(cmd.Wait())
+		if err := <-ch; err != nil {
+			log.Fatalf("unable to open browser: %s", err)
+		}
 	}
 }
