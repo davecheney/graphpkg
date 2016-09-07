@@ -16,7 +16,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path"
 	"regexp"
+	"strings"
 
 	"github.com/pkg/browser"
 )
@@ -41,6 +43,10 @@ func findImport(p string) {
 		// seen this package before, skip it
 		return
 	}
+	if strings.HasPrefix(p, "golang_org") {
+		p = path.Join("vendor", p)
+	}
+
 	pkg, err := build.Import(p, "", 0)
 	if err != nil {
 		log.Fatal(err)
