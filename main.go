@@ -93,7 +93,7 @@ func allKeys() []string {
 		}
 	}
 	v := make([]string, 0, len(keys))
-	for k, _ := range keys {
+	for k := range keys {
 		v = append(v, k)
 	}
 	return v
@@ -128,7 +128,7 @@ func main() {
 	cmd := exec.Command("dot", "-Tsvg")
 	in, err := cmd.StdinPipe()
 	check(err)
-	out, err := cmd.StdoutPipe()
+	out, _ := cmd.StdoutPipe()
 	cmd.Stderr = os.Stderr
 	check(cmd.Start())
 
