@@ -65,7 +65,10 @@ func findImport(p string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	pkgs[p] = filter(pkg.Imports)
+	allImports := pkg.Imports
+	allImports = append(allImports, pkg.TestImports...)
+	allImports = append(allImports, pkg.XTestImports...)
+	pkgs[p] = filter(allImports)
 	for _, pkg := range pkgs[p] {
 		findImport(pkg)
 	}
