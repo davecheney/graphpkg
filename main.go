@@ -60,7 +60,8 @@ func findImport(p string) {
 		p = path.Join("vendor", p)
 	}
 
-	pkg, err := ctx.Import(p, "", 0)
+	wd, _ := os.Getwd()
+	pkg, err := ctx.Import(p, wd, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
