@@ -28,7 +28,20 @@ var (
 	matchvar = flag.String("match", ".*", "filter packages")
 	stdout   = flag.Bool("stdout", false, "print to standard output instead of browser")
 	pkgmatch *regexp.Regexp
+	tags     stringSlice
+	ctx      build.Context
 )
+
+type stringSlice []string
+
+func (ss *stringSlice) String() string {
+	return strings.Join(*ss, ",")
+}
+
+func (ss *stringSlice) Set(s string) error {
+	*ss = append(*ss, strings.Split(s, ",")...)
+	return nil
+}
 
 func findImport(p string) {
 	if !pkgmatch.MatchString(p) {
@@ -47,7 +60,7 @@ func findImport(p string) {
 		p = path.Join("vendor", p)
 	}
 
-	pkg, err := build.Import(p, "", 0)
+	pkg, err := ctx.Import(p, "", 0)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,8 +104,11 @@ func keys() map[string]int {
 }
 
 func init() {
+	flag.Var(&tags, "tags", "a list of build tags to consider satisfied during the build")
 	flag.Parse()
 	pkgmatch = regexp.MustCompile(*matchvar)
+	ctx = build.Default
+	ctx.BuildTags = tags
 }
 
 func check(err error) {
