@@ -30,7 +30,7 @@ var (
 	pkgmatch *regexp.Regexp
 )
 
-func findImport(p string) {
+func findImport(p string, rootp string) {
 	if !pkgmatch.MatchString(p) {
 		// doesn't match the filter, skip it
 		return
@@ -47,13 +47,13 @@ func findImport(p string) {
 		p = path.Join("vendor", p)
 	}
 
-	pkg, err := build.Import(p, "", 0)
+	pkg, err := build.Import(p, rootp, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 	pkgs[p] = filter(pkg.Imports)
 	for _, pkg := range pkgs[p] {
-		findImport(pkg)
+		findImport(pkg, rootp)
 	}
 }
 
@@ -102,8 +102,14 @@ func check(err error) {
 }
 
 func main() {
+	var rootPkg * build.Package
+	var e error
 	for _, pkg := range flag.Args() {
-		findImport(pkg)
+		rootPkg, e = build.Import(pkg, "", 0)
+		if e != nil {
+			log.Fatal(e)
+		}
+		findImport(pkg, rootPkg.Dir)
 	}
 	cmd := exec.Command("dot", "-Tsvg")
 	in, err := cmd.StdinPipe()
